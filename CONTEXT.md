@@ -48,6 +48,10 @@ _Avoid_: Relatório, laudo
 Sugestão de assuntos para a próxima sessão, montada a partir dos resumos desde a última sessão.
 _Avoid_: Plano de sessão
 
+**Convite**:
+Link enviado ao paciente, a pedido do psicólogo, para criar a senha e entrar pela primeira vez. Expira e pode ser reenviado.
+_Avoid_: Cadastro do paciente (o cadastro é o que o psicólogo preenche)
+
 **Consentimento**:
 Aceite explícito do paciente, dado antes da primeira mensagem, que inclui saber que o psicólogo lê toda a conversa.
 _Avoid_: Termo de uso
