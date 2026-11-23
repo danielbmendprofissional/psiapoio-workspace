@@ -1,46 +1,48 @@
-# ai-base
+# psiapoio-workspace
 
-Projeto base pra todo novo workflow assistido por IA — vira o `<projeto>-workspace` de cada projeto (ver `docs/agents/workspace.md`) — stack-agnóstico no backend, Angular fixo no frontend. O que este repo fixa é o **processo**: discovery → spec → tickets → TDD → review → commit → merge request → esteira de deploy.
+Workspace do **PsiApoio**: especificações, decisões (ADRs), glossário e o processo de desenvolvimento. O código mora em repositórios próprios. Parte do projeto [PsiApoio](https://github.com/danielbmendprofissional/psiapoio).
 
-## Por onde começar
+| Repositório | Papel |
+|---|---|
+| [psiapoio](https://github.com/danielbmendprofissional/psiapoio) | Vitrine e visão geral |
+| **psiapoio-workspace** (este) | Specs, ADRs, glossário, processo |
+| [psiapoio-api](https://github.com/danielbmendprofissional/psiapoio-api) | API .NET |
+| [psiapoio-frontend](https://github.com/danielbmendprofissional/psiapoio-frontend) | Front Angular |
+| [psiapoio-agent](https://github.com/danielbmendprofissional/psiapoio-agent) | Serviço Python do agente |
 
-- Ideal utilizar o agent de infra do `ai-ops` (`local-environment-config`) pra configuração de máquina e configuração inicial de projeto; depois, com tudo configurado, inicia o workflow com o Claude Code.
+## O que é o PsiApoio
 
-## Estrutura do repo
+Um agente de IA acompanha o paciente entre as sessões de psicologia, sob configuração e supervisão do psicólogo. É um companheiro de **escopo fechado**, não um terapeuta: reforça tarefas combinadas, registra humor e acolhe. O psicólogo lê toda a conversa, recebe **Alertas** quando uma mensagem é classificada como `atenção` ou `risco`, e ganha **Resumo diário** e **Pauta** para a sessão.
 
-- `CLAUDE.md` — instruções de projeto pro Claude Code.
-- `README.md` — este arquivo.
-- `docs/workflow.md` — o pipeline completo, discovery → esteira de deploy.
+## Conteúdo
 
-### `docs/agents/` — skills e regras de execução
+| Caminho | O que é |
+|---|---|
+| [CONTEXT.md](CONTEXT.md) | Glossário do domínio (Psicólogo, Paciente, Acompanhamento, Perfil do agente, Tarefa, Gatilho, Alerta...) |
+| [docs/adr/](docs/adr/) | Decisões: agente de escopo fechado (0001), reação a risco (0002), API dona do Postgres (0003), LLM atrás de interface (0004), direção de design (0005), autenticação por JWT em cookie (0006) |
+| [specs/README.md](specs/README.md) | Mapa de escopo e as 13 fatias (todas feitas) |
+| [specs/transversal.md](specs/transversal.md) | Modelo de dados, formulários, contrato API↔agente, regras pequenas, ambiente |
+| [COMO-RODAR.md](COMO-RODAR.md) | Passo a passo para subir tudo e roteiro de demonstração |
+| `docs/`, `.claude/` | Processo e regras do template de trabalho assistido por IA (discovery → spec → TDD → review) |
 
-- `orchestration.md` — `/implement-task` com subagentes do Claude Code (`data`/`backend`/`front`/`ui`/`tests`/`security`/`review`), os três modos (Claude, pago, free via OmniRoute), execução paralela no Alethe.
-- `workspace.md` — padrão de projeto: workspace (regras + issues) + um repositório por componente (`-api`, `-frontend`).
-- `padrao-frontend.md` / `padrao-api.md` — padrões herdados por todo projeto (stack e camadas do Angular, config em runtime; paginação, erros, sessão BFF, IDs). O discovery confirma; divergência vira ADR.
-- `spec-format.md` — formato de spec e gate de "pronto para especificar" (o `/to-spec` segue este arquivo, não o template da skill).
-- `esteira-deploy.md` — promoção de branch `dev → qa → hml → main`, hotfix.
-- `infra-local.md` — modelo de infra compartilhada (Postgres/Redis/RabbitMQ/Keycloak), o que todo projeto novo ganha nela, e as diferenças pra produção (AWS).
-- `observabilidade-backup.md` — `/health`, `/metrics`, log JSON, backup de Postgres.
-- `security-review.md` — camadas de segurança, skills de auditoria manual, fluxo de correção de achado.
-- `issue-tracker.md` — GitLab MCP / fallback `glab` pra issues e specs.
-- `triage-labels.md` — vocabulário fixo de labels (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`).
-- `domain.md` — como `/domain-modeling` decide contextos, `CONTEXT.md`/`CONTEXT-MAP.md`, ADRs.
+## Arquitetura
 
-### `docs/design/` — stack de UI fixa (Angular + spartan/ui + Tailwind)
+```
+Angular (front) --HTTP /api--> API .NET --SQL--> PostgreSQL
+                                  |
+                                  +--HTTP + X-Api-Key--> Serviço Python --> LLM (Ollama / OmniRoute)
+```
 
-- `component-library.md` — biblioteca de componentes por stack, motion, regra de tema custom obrigatório.
-- `tokens.md` — tokens de design (cor, tipografia, espaçamento, raio/sombra, movimento) como ponto de partida pro `DESIGN.md` gerado por `impeccable`.
-- `principios.md` — cadeia anti-ai-slop (`ui-ux-pro-max-skill` + `impeccable.style` + `avoid-ai-design`).
-- `referencias.md` — catálogo de sites de referência visual (Aceternity UI, 21st.dev, bklit UI) e o papel de cada um.
+A API é a única que fala com o banco e a única que chama o agente; o Python é sem estado.
 
-### `docs/adr/`
+## Rodar
 
-Vazio por padrão — cada projeto real registra suas próprias decisões de arquitetura aqui conforme nascem, não é pré-populado pelo template.
+Ver [COMO-RODAR.md](COMO-RODAR.md). Resumo: Postgres e Mailpit, depois o agente (porta 8000), a API (5159) e o front (4200). Clone os três repositórios de código dentro desta pasta, com os nomes `psiapoio-api`, `psiapoio-frontend` e `psiapoio-agent` (eles são ignorados por este repositório).
 
-### Fora de `docs/`
+## Limitações declaradas
 
-- `.claude/skills/` — **não versionado** (ver `.gitignore`): skills reinstaláveis por comando, não commitadas. `skills-lock.json` (esse sim versionado) registra origem e hash de cada uma, pra reinstalar de forma reprodutível.
-- `.claude/hooks/` — guardrail de git (bloqueia push direto em branch protegida, force push, reset hard, etc — só vale pra sessão Claude Code).
-- `.claude/agents/` e `.claude/commands/implement-task.md` — camada de execução: subagentes de papel (data, backend, front, ui, tests, security, review, qa) e o comando que os orquestra.
-- `.mcp.json` — MCP do projeto (bloco GitLab sempre, GitHub sob demanda), sempre `"disabled": true`.
-- `templates/` — `.gitlab-ci.yml` dos repositórios de código (`api.gitlab-ci.yml`, `frontend.gitlab-ci.yml`), consumindo o `template-ci`. O workspace em si não tem pipeline.
+A detecção de risco por LLM não é infalível (ADR 0002); não há encaminhamento a serviço de emergência (decisão do autor); a sessão dura 60 minutos sem refresh; só dados fictícios. Não use com pacientes reais.
+
+## Origem do processo
+
+A estrutura de processo (`docs/`, `.claude/`, `CLAUDE.md`) vem do template `ai-base`. O projeto adotou só parte dele: sem issue tracker nem orquestração de subagentes (ver "Processo" em [specs/README.md](specs/README.md)).
