@@ -2,18 +2,76 @@
 
 Três serviços (API .NET, agente Python, front Angular) mais Postgres e Mailpit. Definições em [specs/transversal.md](specs/transversal.md).
 
-## Pré-requisitos
+## O que a máquina precisa ter instalado
 
-.NET 10, Node 24, `uv` (Python), Docker. Ollama com o modelo `qwen3.5:9b` (ou um provedor compatível com a API da OpenAI, como o OmniRoute: ver `psiapoio-agent/.env.example`). Só dados fictícios (ADR 0004).
+| Tecnologia | Versão | Para quê | Conferir |
+|---|---|---|---|
+| Git + Git Bash (ou outro terminal bash) | qualquer | clonar e rodar os comandos deste guia | `git --version` |
+| Docker Desktop (com `docker compose`) | recente | Postgres e Mailpit | `docker compose version` |
+| .NET SDK | 10 | API | `dotnet --version` |
+| Node.js (com npm) | 24 | front Angular | `node --version` |
+| `uv` | recente | agente Python (instala o Python 3.12+ sozinho) | `uv --version` |
+| Ollama | recente | modelo de linguagem local do agente | `ollama --version` |
+
+- **Modelo do Ollama:** `qwen3.5:9b` (`ollama pull qwen3.5:9b`, alguns GB). Em vez do Ollama dá para usar qualquer provedor compatível com a API de chat da OpenAI, como o OmniRoute: ver `psiapoio-agent/.env.example`.
+- **Navegador:** qualquer um, com janela anônima (o roteiro usa duas janelas ao mesmo tempo).
+- **Portas livres:** 4200 (front), 5159 (API), 8000 (agente), 5433 (Postgres), 1025 e 8025 (Mailpit), 11434 (Ollama).
+- Só dados fictícios (ADR 0004). Nada aqui depende de infra externa (ADR 0007).
 
 ## Subir (nesta ordem)
 
-1. **Postgres:** infra compartilhada já no ar; banco `aiagentfaculdade`. Gravar a connection string nos user-secrets da API (uma vez):
-   `node <ai-infra>/configs/infra/infra-config.mjs secrets aiagentfaculdade --csproj=psiapoio-api/src/PsiApoio.Api/PsiApoio.Api.csproj`
-2. **Mailpit** (e-mails de convite e de alerta): `docker run -d --name psiapoio-mailpit -p 1025:1025 -p 8025:8025 axllent/mailpit` (caixa em http://localhost:8025).
-3. **Agente:** `cd psiapoio-agent && cp .env.example .env` (ajuste `LLM_MODEL` e `AGENT_API_KEY`), depois `uv run uvicorn psiapoio_agent.main:app --app-dir src --port 8000`.
-4. **API:** `cd psiapoio-api && dotnet user-secrets set "Agent:ApiKey" "<a mesma AGENT_API_KEY>" --project src/PsiApoio.Api && dotnet run --project src/PsiApoio.Api --launch-profile http` (porta 5159; em Development cria as tabelas e o psicólogo de dev sozinha).
-5. **Front:** `cd psiapoio-frontend && npm install && npm start` (http://localhost:4200, com proxy `/api` → 5159). Se a porta 4200 estiver ocupada: `npx ng serve --port 4300`.
+Use o terminal do VS Code (Git Bash). Os passos 1 a 3 rodam na **raiz do workspace** (esta pasta) e terminam sozinhos. Os passos 4, 5 e 6 deixam o terminal ocupado, então abra **um terminal novo (ícone `+`) para cada um**. Mantenha o Docker Desktop aberto e o Ollama rodando.
+
+**1. Postgres e Mailpit:**
+```bash
+docker compose up -d
+docker compose ps
+```
+Sobe o Postgres (porta **5433**, banco `aiagentfaculdade`, criado sozinho na primeira vez) e o Mailpit (caixa de entrada em http://localhost:8025). No `docker compose ps`, o `postgres` deve aparecer como `healthy`; se estiver `starting`, espere uns 10 segundos e rode de novo. Se der erro de porta 1025/8025 ocupada, é um Mailpit antigo: `docker rm -f psiapoio-mailpit` e repita.
+
+**2. Modelo de linguagem** (uma vez):
+```bash
+ollama pull qwen3.5:9b
+```
+
+**3. Connection strings e chave da API** (uma vez; grava nos user-secrets, fora do código):
+```bash
+dotnet user-secrets set "ConnectionStrings:PostgresMigrations" "Host=localhost;Port=5433;Database=aiagentfaculdade;Username=aiagentfaculdade_owner;Password=aiagentfaculdade_owner_dev" --project psiapoio-api/src/PsiApoio.Api
+dotnet user-secrets set "ConnectionStrings:Postgres" "Host=localhost;Port=5433;Database=aiagentfaculdade;Username=aiagentfaculdade_app;Password=aiagentfaculdade_app_dev" --project psiapoio-api/src/PsiApoio.Api
+dotnet user-secrets set "Agent:ApiKey" "minha-chave-dev" --project psiapoio-api/src/PsiApoio.Api
+```
+As senhas do banco são de desenvolvimento e fixas, as mesmas do `docker-compose.yml`. `minha-chave-dev` é uma chave inventada que a API e o agente usam para se reconhecer: **tem de ser idêntica** ao `AGENT_API_KEY` do passo 4 (pode trocar o texto, desde que troque nos dois lados).
+
+**4. Agente (terminal 1).** Crie o `.env` a partir do exemplo:
+```bash
+cd psiapoio-agent
+cp .env.example .env
+```
+Abra `psiapoio-agent/.env`, altere **só estas duas linhas** e salve (`AGENT_API_KEY` é a última linha do arquivo e vem vazia; não mexa em `LLM_API_KEY=ollama`):
+```
+LLM_MODEL=qwen3.5:9b
+AGENT_API_KEY=minha-chave-dev
+```
+Depois rode:
+```bash
+uv run python -m uvicorn psiapoio_agent.main:app --app-dir src --port 8000
+```
+(Chamar pelo `python -m` evita o erro `uv trampoline failed to canonicalize script path` do Windows.) Pronto quando aparecer `Uvicorn running on http://127.0.0.1:8000`.
+
+**5. API (terminal 2):**
+```bash
+cd psiapoio-api
+dotnet run --project src/PsiApoio.Api --launch-profile http
+```
+Pronta quando aparecer `Now listening on: http://localhost:5159`. Em Development ela cria as tabelas e o psicólogo de dev sozinha.
+
+**6. Front (terminal 3):**
+```bash
+cd psiapoio-frontend
+npm install
+npm start
+```
+Abre em http://localhost:4200 (proxy `/api` → 5159). Se a porta 4200 estiver ocupada: `npx ng serve --port 4300`.
 
 **Antes de gravar o vídeo:** aqueça o modelo mandando uma mensagem qualquer (a primeira chamada ao Ollama leva dezenas de segundos; a API espera até 90 s).
 
@@ -22,19 +80,49 @@ Três serviços (API .NET, agente Python, front Angular) mais Postgres e Mailpit
 | Papel | E-mail | Senha |
 |---|---|---|
 | Psicólogo | `psicologo@psiapoio.dev` | `Psi12345` |
-| Paciente | criado no cadastro (passo 2 do roteiro) | definida pelo convite |
+| Paciente | criado no cadastro (etapa 1 do roteiro) | definida pelo convite |
 
 ## Roteiro da demonstração
 
-1. Entrar como psicólogo → lista de pacientes vazia.
-2. **Cadastrar paciente** (nome e e-mail fictícios). A tela mostra o link do convite; o e-mail chega no Mailpit.
-3. Abrir o link, criar a senha, entrar como paciente → **Consentimento** → formulário pessoal.
-4. Como psicólogo: abrir o paciente → aba **Acompanhamento** → preencher o formulário clínico (abordagem, tarefas, gatilhos) → salvar → **Aprovar Perfil do agente**.
-5. Como paciente: **Conversa**. Mandar uma mensagem do dia a dia, marcar uma tarefa em "Meus combinados", perguntar algo clínico ("você acha que eu tenho depressão?") para ver o escopo fechado.
-6. Mandar uma mensagem de risco (ex.: "às vezes penso que seria melhor eu não existir"). O paciente recebe a **resposta fixa**.
-7. Como psicólogo: o paciente sobe para o topo da lista com **Risco**; a aba **Conversa e alertas** destaca a mensagem; o e-mail de alerta no Mailpit não traz conteúdo clínico.
-8. Aba **Resumo e pauta**: gerar o **Resumo diário** e a **Pauta**.
-9. Mostrar a avaliação de risco: `cd psiapoio-agent && uv run python eval/run_eval.py --model qwen3.5:9b` (recall de risco e erros graves; limitação declarada no ADR 0002). Última medição (2 passadas das 32 mensagens, 2026-11-09): **recall de risco 22/22** nos dois modelos; acurácia geral 58/64 com `qwen3.5:9b` e 60/64 com `qwen3.5:4b`.
+Parta de um banco limpo (primeira subida, ou "Para recomeçar do zero" mais abaixo). O psicólogo de dev é o único usuário que existe. Use **duas janelas**: uma normal (psicólogo) e uma anônima, Ctrl+Shift+N (paciente), para as duas sessões coexistirem.
+
+**Etapa 1: o psicólogo cadastra o paciente**
+1. Na janela normal, abra http://localhost:4200 e entre com `psicologo@psiapoio.dev` / `Psi12345`. A lista de pacientes está vazia.
+2. Clique em **Cadastrar paciente** e preencha nome e e-mail fictícios. A tela mostra o **link do convite** (copie); o mesmo e-mail chega no Mailpit (http://localhost:8025).
+
+**Etapa 2: o paciente aceita o convite**
+3. Na janela anônima, cole o link do convite e defina a senha.
+4. Entre como paciente (e-mail cadastrado + a senha definida), aceite o **Consentimento** e preencha o formulário pessoal.
+5. Na janela normal (psicólogo), aprove o perfil. **Sem isso o chat não abre** (o paciente vê "O seu psicólogo ainda está ajustando o acompanhamento"). **Pacientes** → clique no nome do paciente → aba **Acompanhamento** → preencha o formulário clínico (abordagem, tarefas, gatilhos) → salvar → **Aprovar Perfil do agente**.
+
+**Etapa 3: o paciente conversa com o chat**
+6. Na janela anônima, abra **Conversa** e mande uma mensagem do dia a dia (a primeira demora, ver "Antes de gravar o vídeo").
+7. Em **Combinados**, marque uma tarefa. Volte à **Conversa** e pergunte algo clínico ("você acha que eu tenho depressão?"): o agente deve recusar (escopo fechado).
+8. Mande uma mensagem de risco (ex.: "às vezes penso que seria melhor eu não existir"). O paciente recebe a **resposta fixa**.
+
+**Etapa 4: o psicólogo analisa o paciente**
+9. Na janela normal, recarregue **Pacientes** (F5): o paciente sobe para o topo com a marca **Risco**. O e-mail de alerta no Mailpit não traz conteúdo clínico.
+10. Clique no nome do paciente. Aba **Conversa e alertas**: a mensagem de risco aparece destacada.
+11. Aba **Resumo e pauta**: gere o **Resumo diário** e a **Pauta**.
+
+**Avaliação de risco (opcional)**
+12. `cd psiapoio-agent && uv run python eval/run_eval.py --model qwen3.5:9b` (recall de risco e erros graves; limitação declarada no ADR 0002). Última medição (2 passadas das 32 mensagens, 2026-11-09): **recall de risco 22/22** nos dois modelos; acurácia geral 58/64 com `qwen3.5:9b` e 60/64 com `qwen3.5:4b`.
+
+## Para recomeçar do zero
+
+Apaga todos os dados de teste (pacientes, conversas, alertas e e-mails) e deixa só o psicólogo de dev.
+
+1. Pare a API: Ctrl+C no terminal 2.
+2. Na raiz do workspace:
+   ```bash
+   docker compose down -v
+   docker compose up -d
+   ```
+   Isso apaga o volume do banco e a caixa do Mailpit e recria tudo vazio.
+3. Suba a API de novo (passo 5): é ela que recria as tabelas e o psicólogo de dev.
+4. Dê F5 no front e feche a janela anônima antiga. As connection strings (passo 3) não precisam ser regravadas.
+
+O agente e o front podem continuar rodando.
 
 ## Testes
 

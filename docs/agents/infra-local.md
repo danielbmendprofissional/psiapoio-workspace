@@ -1,5 +1,7 @@
 # Infra local: serviços de contexto + segurança
 
+> **PsiApoio diverge desta página:** usa Postgres e Mailpit próprios, de um `docker-compose.yml` na raiz do workspace, para rodar sem o `ai-infra` (ADR 0007). O contrato de chaves abaixo continua valendo; só a origem dos valores muda.
+
 ## Modelo: infra compartilhada, não por projeto
 
 Uma instância só, permanente, de Postgres/Redis/RabbitMQ/Keycloak (+ observabilidade) no repo `ai-infra`. Todo projeto aponta pra essa instância — **nunca sobe container próprio** desses serviços.

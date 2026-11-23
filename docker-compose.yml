@@ -1,0 +1,36 @@
+# Infra local do PsiApoio, autocontida (ADR 0007): Postgres + Mailpit.
+# Só dados fictícios e senhas de desenvolvimento; não usar fora da máquina local.
+#   subir:   docker compose up -d
+#   parar:   docker compose down
+#   zerar:   docker compose down -v   (apaga o banco; o init recria tudo na próxima subida)
+name: psiapoio
+
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_dev
+    ports:
+      # 5433 no host para não colidir com um Postgres local na 5432
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # roda só na primeira subida (volume vazio): cria banco e as duas roles
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  mailpit:
+    image: axllent/mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # caixa de entrada: http://localhost:8025
+
+volumes:
+  pgdata:

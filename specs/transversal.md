@@ -4,7 +4,7 @@ Vale para todas as fatias do [mapa](README.md). Quando uma spec de fatia divergi
 
 ## 1. Modelo de dados
 
-Dono: a API .NET (EF Core + Npgsql, migrations com `ConnectionStrings:PostgresMigrations`, runtime com `ConnectionStrings:Postgres`). Banco `aiagentfaculdade` da infra compartilhada. Ids `uuid`, datas `timestamptz` em UTC, "dia" como `date` (regra na seção 4).
+Dono: a API .NET (EF Core + Npgsql, migrations com `ConnectionStrings:PostgresMigrations`, runtime com `ConnectionStrings:Postgres`). Banco `aiagentfaculdade`, no Postgres do `docker-compose.yml` do projeto (ADR 0007). Ids `uuid`, datas `timestamptz` em UTC, "dia" como `date` (regra na seção 4).
 
 ```
 AspNetUsers (Identity)       Id, Email, PasswordHash...   papel: Psicologo | Paciente (AspNetRoles)
@@ -174,8 +174,8 @@ Erros em `application/problem+json` com um campo extra `codigo` (ex.: `limite_di
 
 | Peça | Como sobe | Config |
 |---|---|---|
-| Postgres | infra compartilhada (`ai-infra`), já de pé; banco `aiagentfaculdade` | user-secrets da API (`ConnectionStrings:Postgres`, `...PostgresMigrations`), gravados por `node ai-infra/configs/infra/infra-config.mjs secrets aiagentfaculdade --csproj=<csproj>` |
-| Mailpit | `docker run -d --name psiapoio-mailpit -p 1025:1025 -p 8025:8025 axllent/mailpit` | `Smtp:Host=localhost`, `Smtp:Port=1025`; caixa em http://localhost:8025 |
+| Postgres | `docker compose up -d` na raiz do workspace (infra própria, ADR 0007); porta `5433`, banco `aiagentfaculdade` | user-secrets da API (`ConnectionStrings:Postgres`, `...PostgresMigrations`), comandos no `COMO-RODAR.md` |
+| Mailpit | `docker compose up -d` (mesmo compose) | `Smtp:Host=localhost`, `Smtp:Port=1025`; caixa em http://localhost:8025 |
 | Agente (Python) | `cd psiapoio-agent && cp .env.example .env && uv run uvicorn psiapoio_agent.main:app --app-dir src --port 8000` | `.env`: Ollama `qwen3.5:9b` (já baixado) ou OmniRoute; `AGENT_API_KEY` |
 | API (.NET) | `dotnet run --project psiapoio-api/src/PsiApoio.Api` (porta `5159` em `launchSettings.json`) | `Agent:BaseUrl`, `Agent:ApiKey`, `Smtp:*` |
 | Front (Angular) | `cd psiapoio-frontend && npm start` | proxy `/api` → `http://localhost:5159` (`proxy.conf.json`) |
