@@ -47,11 +47,13 @@ As senhas do banco são de desenvolvimento e fixas, as mesmas do `docker-compose
 cd psiapoio-agent
 cp .env.example .env
 ```
-Abra `psiapoio-agent/.env`, altere **só estas duas linhas** e salve (`AGENT_API_KEY` é a última linha do arquivo e vem vazia; não mexa em `LLM_API_KEY=ollama`):
-```
-LLM_MODEL=qwen3.5:9b
-AGENT_API_KEY=minha-chave-dev
-```
+Abra `psiapoio-agent/.env` e faça duas coisas, depois salve:
+
+1. Preencha `AGENT_API_KEY=minha-chave-dev` (última linha do arquivo, vem vazia).
+2. **Escolha o provedor do modelo de linguagem** (o arquivo traz as duas opções prontas):
+   - **Opção A, modelo local (Ollama):** não mude nada, o padrão já é `qwen3.5:9b` (precisa do passo 2).
+   - **Opção B, chave de API** (para máquinas sem folga para rodar o modelo local): comente (`#`) as 5 linhas da Opção A, descomente as da Opção B e preencha `LLM_API_KEY` com a chave, `LLM_BASE_URL` com a URL do provedor e `LLM_MODEL` com o nome do modelo. Nesse caso o Ollama e o passo 2 não são necessários.
+
 Depois rode:
 ```bash
 uv run python -m uvicorn psiapoio_agent.main:app --app-dir src --port 8000
